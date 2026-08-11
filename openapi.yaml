@@ -1,0 +1,81 @@
+openapi: 3.0.3
+info:
+  title: plate API
+  version: 1.0.0
+  description: REST API for generating standardized file names and persisting them in SQLite.
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/v1/plate:
+    post:
+      summary: Generate and store a standardized file name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rawName
+              properties:
+                rawName:
+                  type: string
+                  example: google chrome passwords.csv
+      responses:
+        '201':
+          description: File name generated and stored
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - generatedName
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  generatedName:
+                    type: string
+                    example: dapa_gogl_chrm_pswd_usen_6811.csv
+        '400':
+          description: Invalid request body
+  /api/v1/plate/{id}:
+    get:
+      summary: Fetch a generated file name record by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Plate record found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlateRecord'
+        '404':
+          description: Plate record not found
+components:
+  schemas:
+    PlateRecord:
+      type: object
+      required:
+        - id
+        - rawName
+        - generatedName
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        rawName:
+          type: string
+        generatedName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
