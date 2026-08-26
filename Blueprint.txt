@@ -1,0 +1,457 @@
+OPEN PLATE — IMPLEMENTATION BLUEPRINT
+
+Scope:
+Implement only the functionality explicitly specified in the Open Plate PR. Do not add improvements, additional endpoints, authentication, deployment features, database alternatives, or other functionality not stated in the specification.
+
+
+1. OBJECTIVE
+
+Build a Universal File Naming API that:
+
+Raw file name
+        ↓
+Tokenization / normalization
+        ↓
+Standardized machine-readable name
+        ↓
+Persist record in SQLite
+        ↓
+Return UUID + generated name
+
+Example:
+
+Input:
+google chrome passwords.csv
+
+Output:
+dapa_gogl_chrm_pswd_usen_6811.csv
+
+
+2. REQUIRED NAME FORMAT
+
+The generated filename must follow:
+
+<platform>_<place>_<persona>_<purpose>[_extras...]_<language>_<date>.<ext>
+
+The generated name must therefore contain:
+
+- Platform
+- Place
+- Persona
+- Purpose
+- Optional extra segments when required
+- Language
+- Date
+- File extension
+
+
+3. NAME PARSING
+
+File:
+
+src/nameParser.ts
+
+Responsibilities:
+
+- Accept the raw filename information.
+- Tokenize the raw name.
+- Remove stop words.
+- Convert relevant words into 4-letter codes.
+- Apply the specified consonant-reduction fallback.
+- Apply the specified brand/name overrides.
+
+Required overrides include:
+
+google → gogl
+chrome → chrm
+passwords → pswd
+
+The parser must produce the segments required by the standardized filename format.
+
+Do not introduce additional naming rules beyond those specified by the PR.
+
+
+4. PLATFORM
+
+File:
+
+src/plateService.ts
+
+Responsibilities:
+
+- Use "dapa" as the default platform prefix.
+- Support the PLATFORM environment variable as an override.
+
+Default:
+
+dapa
+
+If PLATFORM is configured, the configured platform value is used instead.
+
+
+5. DATE GENERATION
+
+File:
+
+src/plateService.ts
+
+Responsibilities:
+
+- Generate the date component according to the specification.
+- Derive the date code from YYMMDD.
+- Apply the specified zero-stripping rule.
+
+Required example:
+
+2026-08-11 → 6811
+
+Do not create a different date-formatting scheme.
+
+
+6. FILE EXTENSION
+
+The generated filename must preserve/use the appropriate file extension.
+
+The implementation must support the specified NAKF fallback behavior.
+
+If the extension cannot be determined according to the specified behavior, use:
+
+NAKF
+
+The NAKF extension fallback must be covered by the required tests.
+
+
+7. PLATE SERVICE
+
+File:
+
+src/plateService.ts
+
+Responsibilities:
+
+- Receive the parsed filename information.
+- Assemble the standardized filename.
+- Apply the platform.
+- Apply the language code.
+- Apply the generated date code.
+- Apply the file extension.
+- Produce the final generated filename.
+
+Example result:
+
+dapa_gogl_chrm_pswd_usen_6811.csv
+
+
+8. DATABASE
+
+File:
+
+src/db.ts
+
+Database technology:
+
+SQLite
+
+Library:
+
+better-sqlite3
+
+Requirements:
+
+- File-based SQLite database.
+- Zero-configuration database setup.
+- Persist generated plate records.
+- Store the UUID associated with the generated record.
+- Store the generated filename information required for retrieval.
+
+No PostgreSQL, MySQL, Redis, or other database technology is required.
+
+
+9. CREATE API
+
+Endpoint:
+
+POST /api/v1/plate
+
+Purpose:
+
+Generate and persist a standardized filename.
+
+Flow:
+
+1. Receive the raw filename request.
+2. Parse/tokenize the filename.
+3. Generate the required filename segments.
+4. Generate the date component.
+5. Determine the file extension.
+6. Apply NAKF when required.
+7. Assemble the standardized filename.
+8. Generate a UUID.
+9. Persist the plate record in SQLite.
+10. Return the UUID and generated filename.
+
+Required response structure:
+
+{
+  "id": "<uuid>",
+  "generatedName": "<standardized filename>"
+}
+
+
+10. READ API
+
+Endpoint:
+
+GET /api/v1/plate/:id
+
+Purpose:
+
+Retrieve a stored plate record by UUID.
+
+Flow:
+
+1. Receive the UUID from the URL.
+2. Look up the corresponding record in SQLite.
+3. Return the stored plate record.
+
+The implementation only needs the read operation specified by the PR.
+
+Do not add update or delete functionality.
+
+
+11. EXPRESS ROUTING
+
+Files:
+
+src/router.ts
+src/index.ts
+
+Responsibilities:
+
+src/router.ts:
+- Define the required REST routes.
+- Connect the routes to the appropriate service/database operations.
+
+src/index.ts:
+- Initialize the Express application.
+- Register the router.
+- Configure the required middleware.
+- Start the API server.
+- Configure the Swagger UI endpoint.
+
+
+12. SWAGGER / OPENAPI
+
+Endpoint:
+
+GET /docs
+
+Requirements:
+
+- Provide Swagger UI.
+- Use an OpenAPI 3.0 specification.
+- Document the required API endpoints.
+- Allow the API to be inspected/tested through Swagger UI.
+
+Required documented endpoints:
+
+POST /api/v1/plate
+
+GET /api/v1/plate/:id
+
+Swagger UI:
+
+/docs
+
+
+13. TESTING
+
+File:
+
+tests/plate.test.ts
+
+Testing stack:
+
+- Jest
+- Supertest
+
+The required tests must cover:
+
+A. Create
+
+Verify that:
+
+- A plate can be created.
+- A generated UUID is returned.
+- A generated standardized filename is returned.
+
+B. Read
+
+Verify that:
+
+- A previously created plate can be retrieved using its UUID.
+
+C. NAKF extension fallback
+
+Verify that:
+
+- The required NAKF fallback behavior works correctly when the extension cannot be determined according to the specification.
+
+
+14. TECHNOLOGY STACK
+
+Use only the stack specified by the PR:
+
+- TypeScript
+- TypeScript strict mode
+- Express
+- better-sqlite3
+- uuid
+- swagger-ui-express
+- Jest
+- Supertest
+- SQLite
+
+
+15. REQUIRED PROJECT STRUCTURE
+
+The implementation should contain the components specified by the PR:
+
+open-plate/
+│
+├── src/
+│   ├── nameParser.ts
+│   ├── plateService.ts
+│   ├── db.ts
+│   ├── router.ts
+│   └── index.ts
+│
+└── tests/
+    └── plate.test.ts
+
+The exact existing repository structure should be preserved where possible rather than creating an unnecessary new architecture.
+
+
+16. IMPLEMENTATION ORDER
+
+PHASE 1 — Inspect Existing PR
+
+- Inspect the existing Copilot implementation.
+- Identify which required components already exist.
+- Do not rewrite working code unnecessarily.
+
+PHASE 2 — Project Setup
+
+- Ensure the TypeScript project is correctly configured.
+- Ensure the required dependencies are available.
+- Ensure TypeScript strict mode is enabled.
+
+PHASE 3 — Name Parser
+
+- Implement/verify src/nameParser.ts.
+- Verify tokenization.
+- Verify stop-word removal.
+- Verify 4-letter code generation.
+- Verify consonant-reduction fallback.
+- Verify the specified overrides.
+
+PHASE 4 — Plate Service
+
+- Implement/verify src/plateService.ts.
+- Verify segment assembly.
+- Verify default dapa platform.
+- Verify PLATFORM override.
+- Verify language component.
+- Verify date-code generation.
+- Verify extension handling.
+- Verify NAKF fallback.
+
+PHASE 5 — SQLite
+
+- Implement/verify src/db.ts.
+- Initialize the file-based SQLite database.
+- Persist generated records.
+- Support lookup by UUID.
+
+PHASE 6 — REST API
+
+- Implement/verify POST /api/v1/plate.
+- Implement/verify GET /api/v1/plate/:id.
+- Connect the routes to the plate service and database.
+
+PHASE 7 — Swagger
+
+- Configure Swagger UI at /docs.
+- Provide the OpenAPI 3.0 specification.
+- Document the two required API operations.
+
+PHASE 8 — Tests
+
+- Implement/verify tests/plate.test.ts.
+- Test create.
+- Test read.
+- Test NAKF fallback.
+
+PHASE 9 — Final Verification
+
+Verify that:
+
+- The application starts successfully.
+- POST /api/v1/plate works.
+- A UUID is generated.
+- A standardized filename is generated.
+- The record is persisted.
+- GET /api/v1/plate/:id works.
+- Swagger is available at /docs.
+- NAKF fallback works.
+- Required tests pass.
+
+
+17. EXPLICITLY OUT OF SCOPE
+
+Do NOT implement anything that is not explicitly required by the provided Open Plate specification.
+
+Specifically, do not add:
+
+- Authentication
+- Authorization
+- OpenBao integration
+- gRPC
+- Docker
+- Cloud deployment
+- PostgreSQL
+- Redis
+- Frontend
+- Update endpoint
+- Delete endpoint
+- Extra REST endpoints
+- Extra naming conventions
+- Extra database systems
+- CI/CD
+- Additional security systems
+- Performance optimizations
+- Additional API features
+- Additional improvements not requested in the PR
+
+
+18. DEFINITION OF DONE
+
+Open Plate is considered complete for this assignment when the specified implementation is working and verified:
+
+1. Raw filenames can be normalized into the specified format.
+2. The specified parsing rules and overrides work.
+3. The dapa platform default works.
+4. PLATFORM override works.
+5. The specified date-code logic works.
+6. File extension handling works.
+7. NAKF fallback works.
+8. Generated records are persisted in SQLite.
+9. POST /api/v1/plate works.
+10. GET /api/v1/plate/:id works.
+11. UUID records can be retrieved.
+12. Swagger UI works at /docs.
+13. OpenAPI 3.0 documentation is available.
+14. Jest + Supertest tests cover create, read, and NAKF fallback.
+15. The implementation uses the specified TypeScript/Express/SQLite stack.
+
+Nothing beyond this specification is required.
