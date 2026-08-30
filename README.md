@@ -1,2 +1,2 @@
-# dapa_open_plate
+# open plate
 Universal File Naming API
